@@ -1,0 +1,7 @@
+{
+  "status": "unknown",
+  "publisherName": "FICTIONAL EXAMPLE ONLY - Not a verified publisher",
+  "installerThumbprint": "FICTIONAL-INSTALLER-THUMBPRINT-NOT-A-CERTIFICATE",
+  "applicationThumbprint": "FICTIONAL-APPLICATION-THUMBPRINT-NOT-A-CERTIFICATE",
+  "timestampSubject": "FICTIONAL TIMESTAMP SUBJECT - Not a timestamp authority"
+}

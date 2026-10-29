@@ -1,0 +1,73 @@
+-- Manual deployment only: run this before init_snowflake.sql. Standard CLI builds tables from ORM metadata.
+create table if not exists app_update_application (
+    id bigint not null comment '主键 ID（雪花ID）',
+    `key` varchar(64) not null comment '应用标识',
+    name varchar(128) not null comment '应用名称',
+    description text null comment '应用说明',
+    status varchar(16) default 'enabled' comment '状态: enabled/disabled',
+    deleted bigint default 0 comment '是否已删除（0：否；id：是）',
+    deleted_time datetime null comment '删除时间',
+    created_time datetime null comment '创建时间',
+    updated_time datetime null comment '更新时间',
+    primary key (id),
+    unique key uk_app_update_application_key (`key`)
+) engine=InnoDB default charset=utf8mb4 comment='应用更新-应用表';
+create table if not exists app_update_channel (
+    id bigint not null comment '主键 ID（雪花ID）',
+    application_id bigint not null comment '所属应用ID',
+    code varchar(32) not null comment '渠道编码',
+    name varchar(64) not null comment '渠道名称',
+    status varchar(16) default 'enabled' comment '状态: enabled/disabled',
+    current_release_id bigint null comment '客户端当前可见版本ID，逻辑关联 app_update_release.id',
+    deleted bigint default 0 comment '是否已删除（0：否；id：是）',
+    deleted_time datetime null comment '删除时间',
+    created_time datetime null comment '创建时间',
+    updated_time datetime null comment '更新时间',
+    primary key (id),
+    unique key uk_app_update_channel_app_code (application_id, code),
+    key ix_app_update_channel_application_id (application_id),
+    key ix_app_update_channel_current_release_id (current_release_id),
+    constraint fk_app_update_channel_application foreign key (application_id) references app_update_application (id)
+) engine=InnoDB default charset=utf8mb4 comment='应用更新-渠道表';
+create table if not exists app_update_release (
+    id bigint not null comment '主键 ID（雪花ID）',
+    application_id bigint not null comment '所属应用ID',
+    channel_id bigint not null comment '所属渠道ID',
+    version varchar(32) not null comment '版本号，严格 x.y.z',
+    platform varchar(16) default 'win32' comment '平台',
+    arch varchar(16) default 'x64' comment '架构',
+    release_notes text null comment '更新说明',
+    status varchar(16) default 'draft' comment '状态: draft/published/paused',
+    signature_status varchar(32) null comment '来自 release manifest 的签名状态，仅展示',
+    published_by bigint null comment '发布人 sys_user.id，逻辑关联',
+    published_at datetime null comment '发布时间',
+    deleted bigint default 0 comment '是否已删除（0：否；id：是）',
+    deleted_time datetime null comment '删除时间',
+    created_time datetime null comment '创建时间',
+    updated_time datetime null comment '更新时间',
+    primary key (id),
+    unique key uk_app_update_release_identity (application_id, channel_id, version, platform, arch),
+    key ix_app_update_release_application_id (application_id),
+    key ix_app_update_release_channel_id (channel_id),
+    key ix_app_update_release_published_by (published_by),
+    constraint fk_app_update_release_application foreign key (application_id) references app_update_application (id),
+    constraint fk_app_update_release_channel foreign key (channel_id) references app_update_channel (id)
+) engine=InnoDB default charset=utf8mb4 comment='应用更新-版本表';
+create table if not exists app_update_artifact (
+    id bigint not null comment '主键 ID（雪花ID）',
+    release_id bigint not null comment '所属版本ID',
+    kind varchar(16) not null comment '产物类型: installer/blockmap/manifest',
+    filename varchar(255) not null comment '安全文件名',
+    storage_path varchar(512) not null comment '相对存储根目录路径',
+    size bigint not null comment '字节数',
+    sha256 varchar(64) not null comment '小写十六进制 SHA-256',
+    sha512 varchar(128) null comment 'Base64 SHA-512，安装包必填',
+    deleted bigint default 0 comment '是否已删除（0：否；id：是）',
+    deleted_time datetime null comment '删除时间',
+    created_time datetime null comment '创建时间',
+    updated_time datetime null comment '更新时间',
+    primary key (id),
+    unique key uk_app_update_artifact_release_kind (release_id, kind),
+    key ix_app_update_artifact_release_id (release_id),
+    constraint fk_app_update_artifact_release foreign key (release_id) references app_update_release (id)
+) engine=InnoDB default charset=utf8mb4 comment='应用更新-产物表';

@@ -1,0 +1,65 @@
+DO $app_update$
+DECLARE
+    seed record;
+    existing sys_menu%ROWTYPE;
+    parent bigint;
+    demo_id bigint;
+BEGIN
+    FOR seed IN SELECT * FROM (VALUES
+        (1, 'app_update.menu', 'PluginAppUpdate', '/plugins/app-update', 21, 'ant-design:cloud-sync-outlined', 0, NULL, NULL, NULL),
+        (2, 'app_update.releases.menu', 'PluginAppUpdateReleases', '/plugins/app-update/releases', 1, 'ant-design:rocket-outlined', 1, '/plugins/app_update/views/releases', NULL, 'PluginAppUpdate'),
+        (3, 'app_update.applications.menu', 'PluginAppUpdateApplications', '/plugins/app-update/applications', 2, 'ant-design:appstore-outlined', 1, '/plugins/app_update/views/applications', NULL, 'PluginAppUpdate'),
+        (4, '新增应用', 'AppUpdateApplicationAdd', NULL, 1, NULL, 2, NULL, 'app_update:application:add', 'PluginAppUpdateApplications'),
+        (5, '修改应用', 'AppUpdateApplicationEdit', NULL, 2, NULL, 2, NULL, 'app_update:application:edit', 'PluginAppUpdateApplications'),
+        (6, '删除应用', 'AppUpdateApplicationDel', NULL, 3, NULL, 2, NULL, 'app_update:application:del', 'PluginAppUpdateApplications'),
+        (7, '新增渠道', 'AppUpdateChannelAdd', NULL, 4, NULL, 2, NULL, 'app_update:channel:add', 'PluginAppUpdateApplications'),
+        (8, '修改渠道', 'AppUpdateChannelEdit', NULL, 5, NULL, 2, NULL, 'app_update:channel:edit', 'PluginAppUpdateApplications'),
+        (9, '删除渠道', 'AppUpdateChannelDel', NULL, 6, NULL, 2, NULL, 'app_update:channel:del', 'PluginAppUpdateApplications'),
+        (10, '新增版本', 'AppUpdateReleaseAdd', NULL, 1, NULL, 2, NULL, 'app_update:release:add', 'PluginAppUpdateReleases'),
+        (11, '修改版本', 'AppUpdateReleaseEdit', NULL, 2, NULL, 2, NULL, 'app_update:release:edit', 'PluginAppUpdateReleases'),
+        (12, '上传产物', 'AppUpdateReleaseUpload', NULL, 3, NULL, 2, NULL, 'app_update:release:upload', 'PluginAppUpdateReleases'),
+        (13, '发布版本', 'AppUpdateReleasePublish', NULL, 4, NULL, 2, NULL, 'app_update:release:publish', 'PluginAppUpdateReleases'),
+        (14, '暂停版本', 'AppUpdateReleasePause', NULL, 5, NULL, 2, NULL, 'app_update:release:pause', 'PluginAppUpdateReleases'),
+        (15, '删除版本', 'AppUpdateReleaseDel', NULL, 6, NULL, 2, NULL, 'app_update:release:del', 'PluginAppUpdateReleases')
+    ) AS s(ordinal, title, name, path, sort, icon, type, component, perms, parent_name)
+    ORDER BY ordinal
+    LOOP
+        IF (SELECT count(*) FROM sys_menu WHERE name = seed.name) > 1 THEN
+            RAISE EXCEPTION 'app_update menu duplicate name: %', seed.name;
+        END IF;
+        parent := NULL;
+        IF seed.parent_name IS NOT NULL THEN
+            SELECT id INTO STRICT parent FROM sys_menu WHERE name = seed.parent_name;
+        END IF;
+        SELECT * INTO existing FROM sys_menu WHERE name = seed.name;
+        IF FOUND THEN
+            -- Never attach an existing orphan to a newly allocated, unrelated parent ID.
+            IF existing.type IS DISTINCT FROM seed.type
+               OR existing.path IS DISTINCT FROM seed.path
+               OR existing.component IS DISTINCT FROM seed.component
+               OR existing.perms IS DISTINCT FROM seed.perms
+               OR existing.parent_id IS DISTINCT FROM parent
+               OR existing.deleted <> 0 THEN
+                RAISE EXCEPTION 'app_update menu identity conflict: %', seed.name;
+            END IF;
+            UPDATE sys_menu SET title = seed.title WHERE id = existing.id;
+        ELSE
+            INSERT INTO sys_menu (title, name, path, sort, icon, type, component, perms, status, display, cache, link, remark, parent_id, deleted, created_time, updated_time)
+            VALUES (seed.title, seed.name, seed.path, seed.sort, seed.icon, seed.type, seed.component, seed.perms, 1, CASE WHEN seed.type = 2 THEN 0 ELSE 1 END, 1, '', NULL, parent, 0, now(), NULL);
+        END IF;
+    END LOOP;
+    IF EXISTS (SELECT 1 FROM app_update_application WHERE key = 'demo' AND deleted <> 0) THEN
+        RAISE EXCEPTION 'app_update demo is soft-deleted';
+    END IF;
+    INSERT INTO app_update_application (key, name, description, status, deleted, created_time)
+    SELECT 'demo', 'Demo', NULL, 'enabled', 0, now()
+    WHERE NOT EXISTS (SELECT 1 FROM app_update_application WHERE key = 'demo');
+    SELECT id INTO STRICT demo_id FROM app_update_application WHERE key = 'demo' AND deleted = 0;
+    INSERT INTO app_update_channel (application_id, code, name, status, deleted, created_time)
+    SELECT demo_id, 'stable', '正式版', 'enabled', 0, now()
+    WHERE NOT EXISTS (SELECT 1 FROM app_update_channel WHERE application_id = demo_id AND code = 'stable');
+    INSERT INTO app_update_channel (application_id, code, name, status, deleted, created_time)
+    SELECT demo_id, 'beta', '测试版', 'enabled', 0, now()
+    WHERE NOT EXISTS (SELECT 1 FROM app_update_channel WHERE application_id = demo_id AND code = 'beta');
+END;
+$app_update$;

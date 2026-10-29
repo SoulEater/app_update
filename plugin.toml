@@ -1,0 +1,18 @@
+[plugin]
+summary = "应用管理"
+version = "0.2.0"
+description = "管理桌面应用版本、更新渠道和 Electron 更新产物"
+author = "as-fba"
+tags = ["storage"]
+database = ["mysql", "postgresql"]
+
+[app]
+router = ["v1", "feed"]
+
+[settings]
+APP_UPDATE_STORAGE_DIR = "static/upload/app_updates"
+APP_UPDATE_MAX_INSTALLER_BYTES = 536870912
+APP_UPDATE_MAX_BLOCKMAP_BYTES = 10485760
+APP_UPDATE_MAX_MANIFEST_BYTES = 1048576
+APP_UPDATE_UPLOAD_CHUNK_BYTES = 1048576
+APP_UPDATE_PUBLIC_BASE_URL = "https://example.com/updates"
